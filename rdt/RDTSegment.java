@@ -46,21 +46,29 @@ public class RDTSegment {
 		ackReceived = false;
 	}
 	
-	public boolean containsAck() {
+	public boolean containsAck() { //change all to static
 		// complete
-		return true;
+		if(ackNum > 0){ //if ack was set (assume sequence number not negative)
+			return true;
+		}
+		else {
+			return false;
+		}
 	}
 	
 	public boolean containsData() {
 		// complete
-		return true;
+		if(length > 1)
+			return true;
+		else
+			return false;
 	}
 
 	public int computeChecksum() {
 		// complete
 		return 0;
 	}
-	public boolean isValid() {
+	public boolean isValid() { //compare CheckSums
 		// complete
 		return true;
 	}

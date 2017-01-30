@@ -24,7 +24,6 @@ class TimeoutHandler extends TimerTask {
 		ip = ip_addr;
 		port = p;
 	}
-	
 	public void run() {
 		
 		System.out.println(System.currentTimeMillis()+ ":Timeout for seg: " + seg.seqNum);
@@ -32,8 +31,8 @@ class TimeoutHandler extends TimerTask {
 		
 		// complete 
 		switch(RDT.protocol){
-			case RDT.GBN:
-				
+			case RDT.GBN: //default for current implementation
+				System.out.println("We using GBN");
 				break;
 			case RDT.SR:
 				
