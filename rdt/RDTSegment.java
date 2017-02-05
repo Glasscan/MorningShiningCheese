@@ -96,7 +96,7 @@ public class RDTSegment {
 		System.out.println("length: " + length);
 	}
 	public void printData() {
-		System.out.println("Data ... ");
+		System.out.print("Data ... ");
 		for (int i=0; i<length; i++) 
 			System.out.print(data[i]);
 		System.out.println(" ");

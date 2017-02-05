@@ -18,7 +18,7 @@ public class Utility {
 			
 		double d = RDT.random.nextDouble();
 		if ( d < RDT.lossRate) { // simulate network loss
-			System.out.println(System.currentTimeMillis()+":udp_send: Lost Segment: seqNum=" + 
+			System.out.println(/*System.currentTimeMillis()+*/"udp_send: Lost Segment: seqNum=" +
 					       seg.seqNum + "  ackNum=" + seg.ackNum + " ***");
 			System.out.flush();
 	        return;

@@ -33,7 +33,7 @@ public class TestServer {
 	     System.out.println("Server is waiting to receive ... " );
 	
 	     
-	     while (true) {
+	     while(true) {
 	    	 int size = rdt.receive(buf, RDT.MSS);
 	    	 for (int i=0; i<size; i++)
 	    		 System.out.print(buf[i]);
