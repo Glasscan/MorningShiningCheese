@@ -16,7 +16,7 @@ import static java.lang.Thread.sleep;
 public class RDT {
 
 	public static final int MSS = 100; // Max segement size in bytes
-	public static final int RTO = 500; // Retransmission Timeout in msec
+	public static final int RTO = 2000; // Retransmission Timeout in msec (default 500)
 	public static final int ERROR = -1;
 	public static final int MAX_BUF_SIZE = 3;  
 	public static final int GBN = 1;   // Go back N protocol
@@ -27,7 +27,7 @@ public class RDT {
 	public static Random random = new Random(); 
 	public static Timer timer = new Timer();	
 	
-	private DatagramSocket socket; 
+	private  DatagramSocket socket;
 	private InetAddress dst_ip;
 	private int dst_port;
 	private int local_port; 
@@ -36,6 +36,8 @@ public class RDT {
 	private RDTBuffer rcvBuf;
 	
 	private ReceiverThread rcvThread;
+
+	private int sent = 0;
 
 	RDT (String dst_hostname_, int dst_port_, int local_port_) 
 	{
@@ -84,49 +86,30 @@ public class RDT {
 	public int send(byte[] data, int size) { // size is size of data
 		//assume data.length == size
 		int i = 0, j;//iterator i will go through all data up to 'size', j is iterator for segment data
-		int sent = 0;//for the amount of byes sent
 
-		do { //must go through all given data[size] but make new segment when at MSS
+		do {
 			RDTSegment segment = new RDTSegment(); // initialize a new segment
 			int MAX_LEN = RDT.MSS - segment.HDR_SIZE; //max amount of data in segment
 
 			for(j = 0; j < MAX_LEN && i < size; i++, j++){
 				segment.data[j] = data[i];
 			}
-			segment.length = min(MAX_LEN, j);
+			segment.length = min(MAX_LEN, j); //segment may be shorter than max length
 			segment.printData();
 
-			sent = sent + segment.length; //how i define the sequence numbers (delete these lines later)
+			sent = sent + segment.length; //how I define the sequence numbers
 			segment.seqNum = sent;
 
 			sndBuf.putNext(segment);
-			if(sndBuf.next > sndBuf.size - 1){ //if the buffer is full, send contents and reset buffer
-				//System.out.println("Sending buffer contents");
-				for(int k = 0; k < sndBuf.size; k++){
-					//sndBuf.buf[k].timeoutHandler.run();
-					Utility.udp_send(sndBuf.buf[k], socket, dst_ip, dst_port);
-				}
-				for(int k = 0; k < sndBuf.size; k++){
-					sndBuf.buf[k] = null;
-				}
-				sndBuf.next = sndBuf.base;//move the start of buffer to where 'base' is
+			Utility.udp_send(sndBuf.getNext(), socket, dst_ip, dst_port); //send the packet just stored in buffer
 
-			}
+			Timer timer = new Timer();
+			segment.timeoutHandler = new TimeoutHandler(sndBuf, segment, socket, dst_ip, dst_port);
+			timer.schedule(segment.timeoutHandler, RTO); //segment must be removed before timeout
 
-		}while(i < size);
+		} while(i < size); //must go through all given data[size] but make new segment when at MSS
 
-		if(sndBuf.next > 0){ //if not all segments were sent yet
-			//System.out.println("Sending buffer contents ...");
-			for(int k = 0; k < sndBuf.next; k++){ //CHANGE FOR FUTURE USE
-				Utility.udp_send(sndBuf.buf[k], socket, dst_ip, dst_port);
-			}
-			for(int k = 0; k < sndBuf.next; k++){
-				sndBuf.buf[k] = null;
-			}
-			sndBuf.next = sndBuf.base;
-
-		}
-		return sent;
+		return size;
 	}
 	/*
 		public int send(byte[] data, int size) {
@@ -150,7 +133,7 @@ public class RDT {
 
 		try {
 			rcvBuf.semFull.acquire(); //take a full slot
-			for(i = 0; i < rcvBuf.buf[0].data.length; i++){ //copy segment's data into our buffer
+			for(i = 0; i < rcvBuf.buf[0].length; i++){ //copy segment's data into our buffer
 				buf[i] = rcvBuf.buf[0].data[i];
 			}
 			rcvBuf.buf[0] = null;
@@ -201,7 +184,7 @@ class RDTBuffer {
 				buf[next%size] = seg;
 				next++;
 			semMutex.release();
-			semEmpty.release(); //for use in RDT.receive
+			//semEmpty.release(); //release during ACK
 			semFull.release(); // increase #of full slots -> for use by RDT.receive
 		} catch(InterruptedException e) {
 			System.out.println("Buffer put(): " + e);
@@ -260,35 +243,45 @@ class ReceiverThread extends Thread { //working in background
 	public void run() {
 		byte[] buffer = new byte[RDT.MSS];// buffer at most needs MSS
 		DatagramPacket pack = new DatagramPacket(buffer, buffer.length);
+
 		while(true){
 			try {
 				socket.receive(pack);
 				RDTSegment segment = new RDTSegment();
 				byte[] data = pack.getData();
 				makeSegment(segment, data);
-				System.out.print("This was the segment's data: ");
-				segment.printData();
+
 				/*if(segment.computeChecksum() != segment.checksum){ //corrupted checksum?
 					System.out.println("Throwing out corrupted segment: SeqNum: " + segment.seqNum);
 					continue;
 				}*/
 
 				if(segment.containsAck()){ //update the send buffer by removing the corresponding seqNum
+					int find_ack = 0; //this variable finds the location of the ack in sndBuffer
 					System.out.println("Got the ACK for: " + segment.ackNum);//for debugging
-					for(int i = 0; i < sndBuf.size; i++){
-						if(sndBuf.buf[i].seqNum == segment.ackNum && sndBuf.buf != null){
-							sndBuf.buf[i] = null;
+
+					for(int i = 0; i < sndBuf.size  && sndBuf.buf[i] != null; i++){
+						if(sndBuf.buf[i].seqNum == segment.ackNum) {
+							sndBuf.buf[i].ackReceived = true;
+							find_ack = i + 1;
+							break;
 						}
 					}
+					for(int i = 0; i < find_ack; i++){
+						sndBuf.buf[i].timeoutHandler.cancel(); //cancel the timeoutHandler w/ cumulative ACKs
+						sndBuf.buf[i] = null;
+						sndBuf.semEmpty.release();
+					}
+					sndBuf.base = sndBuf.base + find_ack; //assuming cumulative ACKS at play
 					continue; //done here
 				}
 				if(segment.containsData()){ //counterpart to containsAck
+					rcvBuf.putNext(segment); //will now be processed
 					RDTSegment ackSegment = new RDTSegment();
 					ackSegment.ackNum = segment.seqNum;
-					System.out.println("Receiever Thread Found Data! ");// for debugging
-					rcvBuf.putNext(ackSegment);
+					System.out.println("Receiever Thread Found Data");// for debugging
 					System.out.println("Sending ACK: " + ackSegment.ackNum);
-					Utility.udp_send(ackSegment, socket, dst_ip, dst_port);
+					Utility.udp_send(ackSegment, socket, dst_ip, dst_port); //sends and ACK back to sender
 				}
 
 			} catch (IOException e) {

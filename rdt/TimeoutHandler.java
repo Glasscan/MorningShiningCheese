@@ -11,12 +11,12 @@ import java.util.TimerTask;
 
 class TimeoutHandler extends TimerTask {
 	RDTBuffer sndBuf;
-	RDTSegment seg; 
+	RDTSegment seg;
 	DatagramSocket socket;
 	InetAddress ip;
 	int port;
-	
-	TimeoutHandler (RDTBuffer sndBuf_, RDTSegment s, DatagramSocket sock, 
+
+	TimeoutHandler (RDTBuffer sndBuf_, RDTSegment s, DatagramSocket sock,
 			InetAddress ip_addr, int p) {
 		sndBuf = sndBuf_;
 		seg = s;
@@ -25,22 +25,24 @@ class TimeoutHandler extends TimerTask {
 		port = p;
 	}
 	public void run() {
-		
+
 		System.out.println(System.currentTimeMillis()+ ":Timeout for seg: " + seg.seqNum);
 		System.out.flush();
-		
-		// complete 
+
+		// complete
 		switch(RDT.protocol){
 			case RDT.GBN: //default for current implementation
-				System.out.println("We using GBN");
+				for(int i = 0; i < sndBuf.size; i++){
+					System.out.println("would send");
+				}
 				break;
 			case RDT.SR:
-				
+
 				break;
 			default:
 				System.out.println("Error in TimeoutHandler:run(): unknown protocol");
 		}
-		
+
 	}
 } // end TimeoutHandler class
 
