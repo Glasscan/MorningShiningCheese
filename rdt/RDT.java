@@ -99,13 +99,14 @@ public class RDT {
 
 			sent = sent + segment.length; //how I define the sequence numbers
 			segment.seqNum = sent;
+			segment.checksum = segment.computeChecksum();
 
 			sndBuf.putNext(segment);
-			Utility.udp_send(sndBuf.getNext(), socket, dst_ip, dst_port); //send the packet just stored in buffer
+			Utility.udp_send(segment, socket, dst_ip, dst_port); //send the packet just stored in buffer
 
 			Timer timer = new Timer();
 			segment.timeoutHandler = new TimeoutHandler(sndBuf, segment, socket, dst_ip, dst_port);
-			timer.schedule(segment.timeoutHandler, RTO); //segment must be removed before timeout
+			timer.schedule(segment.timeoutHandler, RTO, RTO); //segment must be removed before timeout -> repeats
 
 		} while(i < size); //must go through all given data[size] but make new segment when at MSS
 
@@ -132,7 +133,7 @@ public class RDT {
 		int amount_copy = 0;
 
 		try {
-			rcvBuf.semFull.acquire(); //take a full slot
+			rcvBuf.semFull.acquire(); //take if not empty
 			for(i = 0; i < rcvBuf.buf[0].length; i++){ //copy segment's data into our buffer
 				buf[i] = rcvBuf.buf[0].data[i];
 			}
@@ -173,6 +174,7 @@ class RDTBuffer {
 		semMutex = new Semaphore(1, true);
 		semFull =  new Semaphore(0, true);
 		semEmpty = new Semaphore(bufSize, true);
+
 	}
 
 	
@@ -181,10 +183,9 @@ class RDTBuffer {
 		try {
 			semEmpty.acquire(); // wait for an empty slot 
 			semMutex.acquire(); // wait for mutex 
-				buf[next%size] = seg;
+				buf[(next - base)%size] = seg; //from buf[(next)%size]
 				next++;
 			semMutex.release();
-			//semEmpty.release(); //release during ACK
 			semFull.release(); // increase #of full slots -> for use by RDT.receive
 		} catch(InterruptedException e) {
 			System.out.println("Buffer put(): " + e);
@@ -251,35 +252,53 @@ class ReceiverThread extends Thread { //working in background
 				byte[] data = pack.getData();
 				makeSegment(segment, data);
 
-				/*if(segment.computeChecksum() != segment.checksum){ //corrupted checksum?
-					System.out.println("Throwing out corrupted segment: SeqNum: " + segment.seqNum);
+				if(!segment.isValid()) { //corrupted segment?
+					System.out.println("Corrupted segment: SeqNum: " + segment.seqNum);
 					continue;
-				}*/
-
-				if(segment.containsAck()){ //update the send buffer by removing the corresponding seqNum
-					int find_ack = 0; //this variable finds the location of the ack in sndBuffer
-					System.out.println("Got the ACK for: " + segment.ackNum);//for debugging
-
-					for(int i = 0; i < sndBuf.size  && sndBuf.buf[i] != null; i++){
-						if(sndBuf.buf[i].seqNum == segment.ackNum) {
-							sndBuf.buf[i].ackReceived = true;
-							find_ack = i + 1;
-							break;
-						}
-					}
-					for(int i = 0; i < find_ack; i++){
-						sndBuf.buf[i].timeoutHandler.cancel(); //cancel the timeoutHandler w/ cumulative ACKs
-						sndBuf.buf[i] = null;
-						sndBuf.semEmpty.release();
-					}
-					sndBuf.base = sndBuf.base + find_ack; //assuming cumulative ACKS at play
-					continue; //done here
 				}
+
+				if(segment.containsAck()){ //update the send buffer by removing tint find_ack = -1; //location of the ack in the buffer
+					Boolean found_ack = false;
+
+					//System.out.println("Got ACK: " + segment.ackNum);//for debugging
+					/*System.out.print("Buffer is currently: ");
+					for(int a = 0; a < sndBuf.size && sndBuf.buf[a] != null; a++)
+						System.out.print(sndBuf.buf[a].seqNum + " ");*/ //for debugging
+					System.out.println("");
+					try {
+						sndBuf.semMutex.acquire(); //mandatory; this is a critical section
+						for (int i = 0; i < sndBuf.size && sndBuf.buf[i] != null; i++) {
+							if (sndBuf.buf[i].seqNum == segment.ackNum) {
+								//System.out.println("Confirming segment: " + sndBuf.buf[i].seqNum);//for debugging
+								sndBuf.buf[i].ackReceived = true;
+								sndBuf.buf[i].timeoutHandler.cancel();
+								found_ack = true;
+							}
+						}
+						if(found_ack) {
+							while (sndBuf.buf[0] != null && sndBuf.buf[0].ackReceived) { //slide the window if possible
+								for (int i = 0; i < sndBuf.size - 1 && sndBuf.buf[i] != null; i++) {
+									sndBuf.buf[i] = sndBuf.buf[i + 1];
+								}
+								sndBuf.buf[sndBuf.size - 1] = null; //last slot in buffer now empty
+								sndBuf.base = sndBuf.base + 1;
+								sndBuf.semEmpty.release();
+							}
+
+						}
+						sndBuf.semMutex.release();
+					} catch (InterruptedException e){
+						System.out.println("Slide " + e);
+					}
+
+				}
+
 				if(segment.containsData()){ //counterpart to containsAck
 					rcvBuf.putNext(segment); //will now be processed
 					RDTSegment ackSegment = new RDTSegment();
 					ackSegment.ackNum = segment.seqNum;
-					System.out.println("Receiever Thread Found Data");// for debugging
+					ackSegment.checksum = ackSegment.computeChecksum();
+					//System.out.println("Receiever Thread Found Data");// for debugging
 					System.out.println("Sending ACK: " + ackSegment.ackNum);
 					Utility.udp_send(ackSegment, socket, dst_ip, dst_port); //sends and ACK back to sender
 				}

@@ -40,7 +40,7 @@ public class Utility {
 			System.out.println("udp_send: " + e);
 		}
 		
-		System.out.println(System.currentTimeMillis()+":udp_send: sent Segment: seqNum=" 
+		System.out.println(/*System.currentTimeMillis()+:*/"udp_send: sent Segment: seqNum="
 					+ seg.seqNum + "  ackNum=" + seg.ackNum
 					+ "   After delay= " + delay) ;
 		System.out.flush();

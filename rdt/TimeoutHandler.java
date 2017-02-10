@@ -7,6 +7,7 @@ package rdt;
 
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.Timer;
 import java.util.TimerTask;
 
 class TimeoutHandler extends TimerTask {
@@ -28,12 +29,17 @@ class TimeoutHandler extends TimerTask {
 
 		System.out.println(System.currentTimeMillis()+ ":Timeout for seg: " + seg.seqNum);
 		System.out.flush();
+		/*System.out.print("Buffer: ");
+		for(int i = 0; i < sndBuf.size && sndBuf.buf[i] != null; i++)System.out.print(sndBuf.buf[i].seqNum + " ");
+		System.out.println("");*/ //for debugging
 
 		// complete
 		switch(RDT.protocol){
 			case RDT.GBN: //default for current implementation
-				for(int i = 0; i < sndBuf.size; i++){
-					System.out.println("would send");
+				for(int i = 0; i < sndBuf.size && sndBuf.buf[i] != null; i++){ //resend whole window
+					//if(sndBuf.buf[i].ackReceived) continue; //still need to resend
+					System.out.println("Resending segment: " + sndBuf.buf[i].seqNum);
+					Utility.udp_send(sndBuf.buf[i], socket, ip, port); //resend each segment in buffer
 				}
 				break;
 			case RDT.SR:
