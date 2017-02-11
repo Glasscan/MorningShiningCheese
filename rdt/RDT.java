@@ -15,8 +15,8 @@ import static java.lang.Thread.sleep;
 
 public class RDT {
 
-	public static final int MSS = 100; // Max segement size in bytes
-	public static final int RTO = 2000; // Retransmission Timeout in msec (default 500)
+	public static final int MSS = 10; // Max segment size in bytes
+	public static final int RTO = 200; // Retransmission Timeout in msec (default 500)
 	public static final int ERROR = -1;
 	public static final int MAX_BUF_SIZE = 3;  
 	public static final int GBN = 1;   // Go back N protocol
@@ -89,7 +89,7 @@ public class RDT {
 
 		do {
 			RDTSegment segment = new RDTSegment(); // initialize a new segment
-			int MAX_LEN = RDT.MSS - segment.HDR_SIZE; //max amount of data in segment
+			int MAX_LEN = MSS; //max amount of data in segment
 
 			for(j = 0; j < MAX_LEN && i < size; i++, j++){
 				segment.data[j] = data[i];
@@ -221,8 +221,6 @@ class ReceiverThread extends Thread { //working in background
 	InetAddress dst_ip;
 	int dst_port;
 
-	int set_syn = 0; //set sequence number
-
 	ReceiverThread (RDTBuffer rcv_buf, RDTBuffer snd_buf, DatagramSocket s,
 			InetAddress dst_ip_, int dst_port_) {
 		rcvBuf = rcv_buf;
@@ -242,7 +240,7 @@ class ReceiverThread extends Thread { //working in background
 	//                             stuff (e.g, send ACK)
 	//
 	public void run() {
-		byte[] buffer = new byte[RDT.MSS];// buffer at most needs MSS
+		byte[] buffer = new byte[RDT.MSS + RDTSegment.HDR_SIZE];// buffer at most needs MSS + size of header
 		DatagramPacket pack = new DatagramPacket(buffer, buffer.length);
 
 		while(true){
@@ -257,7 +255,7 @@ class ReceiverThread extends Thread { //working in background
 					continue;
 				}
 
-				if(segment.containsAck()){ //update the send buffer by removing tint find_ack = -1; //location of the ack in the buffer
+				if(segment.containsAck()){
 					Boolean found_ack = false;
 
 					//System.out.println("Got ACK: " + segment.ackNum);//for debugging
@@ -323,7 +321,7 @@ class ReceiverThread extends Thread { //working in background
 		//Note: Unlike C/C++, Java does not support explicit use of pointers! 
 		// we have to make another copy of the data
 		// This is not effecient in protocol implementation
-		for (int i=0; i< seg.length; i++)
+		for (int i=0; i < seg.length; i++)
 			seg.data[i] = payload[i + RDTSegment.HDR_SIZE]; 
 	}
 	
