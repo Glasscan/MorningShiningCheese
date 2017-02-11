@@ -16,12 +16,12 @@ import static java.lang.Thread.sleep;
 public class RDT {
 
 	public static final int MSS = 10; // Max segment size in bytes
-	public static final int RTO = 200; // Retransmission Timeout in msec (default 500)
+	public static final int RTO = 2000; // Retransmission Timeout in msec (default 500)
 	public static final int ERROR = -1;
 	public static final int MAX_BUF_SIZE = 3;  
 	public static final int GBN = 1;   // Go back N protocol
 	public static final int SR = 2;    // Selective Repeat
-	public static final int protocol = GBN;
+	public static final int protocol = SR;
 	
 	public static double lossRate = 0.0;
 	public static Random random = new Random(); 
@@ -134,8 +134,8 @@ public class RDT {
 
 		try {
 			rcvBuf.semFull.acquire(); //take if not empty
-			for(i = 0; i < rcvBuf.buf[0].length; i++){ //copy segment's data into our buffer
-				buf[i] = rcvBuf.buf[0].data[i];
+			for(i = 0; i < rcvBuf.getNext().length; i++){ //copy segment's data into our buffer
+				buf[i] = rcvBuf.getNext().data[i];
 			}
 			rcvBuf.buf[0] = null;
 			rcvBuf.semEmpty.release(); // now an empty slot
@@ -258,7 +258,7 @@ class ReceiverThread extends Thread { //working in background
 				if(segment.containsAck()){
 					Boolean found_ack = false;
 
-					//System.out.println("Got ACK: " + segment.ackNum);//for debugging
+					System.out.println("Got ACK: " + segment.ackNum);//for debugging
 					/*System.out.print("Buffer is currently: ");
 					for(int a = 0; a < sndBuf.size && sndBuf.buf[a] != null; a++)
 						System.out.print(sndBuf.buf[a].seqNum + " ");*/ //for debugging

@@ -36,14 +36,17 @@ class TimeoutHandler extends TimerTask {
 		// complete
 		switch(RDT.protocol){
 			case RDT.GBN: //default for current implementation
-				for(int i = 0; i < sndBuf.size && sndBuf.buf[i] != null; i++){ //resend whole window
+				for(int i = 0; i < sndBuf.size; i++){ //resend whole window
+					if(sndBuf.buf[i] == null)
+						break;
 					//if(sndBuf.buf[i].ackReceived) continue; //still need to resend
 					System.out.println("Resending segment: " + sndBuf.buf[i].seqNum);
 					Utility.udp_send(sndBuf.buf[i], socket, ip, port); //resend each segment in buffer
 				}
 				break;
 			case RDT.SR:
-
+				System.out.println("Resending segment: " + seg.seqNum); //just the one
+				Utility.udp_send(seg, socket, ip, port);
 				break;
 			default:
 				System.out.println("Error in TimeoutHandler:run(): unknown protocol");
