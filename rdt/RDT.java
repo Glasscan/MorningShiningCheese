@@ -1,4 +1,4 @@
-
+//Jonathan Wong jmw35
 /**
  * @author mohamed
  *
@@ -21,7 +21,7 @@ public class RDT {
 	public static final int MAX_BUF_SIZE = 3;  
 	public static final int GBN = 1;   // Go back N protocol
 	public static final int SR = 2;    // Selective Repeat
-	public static final int protocol = SR;
+	public static final int protocol = GBN;
 	
 	public static double lossRate = 0.0;
 	public static Random random = new Random(); 
@@ -102,7 +102,7 @@ public class RDT {
 			segment.checksum = segment.computeChecksum();
 
 			sndBuf.putNext(segment);
-			Utility.udp_send(segment, socket, dst_ip, dst_port); //send the packet just stored in buffer
+			Utility.udp_send(segment, socket, dst_ip, dst_port); //send the packet/segment just stored in buffer
 
 			Timer timer = new Timer();
 			segment.timeoutHandler = new TimeoutHandler(sndBuf, segment, socket, dst_ip, dst_port);
@@ -176,8 +176,6 @@ class RDTBuffer {
 		semEmpty = new Semaphore(bufSize, true);
 
 	}
-
-	
 	// Put a segment in the next available slot in the buffer
 	public void putNext(RDTSegment seg) {		
 		try {
