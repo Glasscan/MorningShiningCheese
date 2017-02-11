@@ -257,7 +257,7 @@ class ReceiverThread extends Thread { //working in background
 					Boolean found_ack = false;
 
 					System.out.println("Got ACK: " + segment.ackNum);//for debugging
-					/*System.out.print("Buffer is currently: ");
+					/*System.out.print("Window is currently: ");
 					for(int a = 0; a < sndBuf.size && sndBuf.buf[a] != null; a++)
 						System.out.print(sndBuf.buf[a].seqNum + " ");*/ //for debugging
 					System.out.println("");

@@ -1,6 +1,15 @@
 Jonathan Wong
 jmw35
 
+The rdt directory should contain:
+  RDT.java
+  RDTSegment.java
+  TimeoutHandler.java
+  Utility.java
+  TestCLient.java
+  TestServer.java
+  Their respective class files, and this txt file.
+
 Known Issues:
   The printing of data from RDT.receive is sequential and may overlap with
   some text from other System.out statements.
@@ -13,7 +22,11 @@ Testing and debugging:
 
 Implementation
 
-None of the bonus implementations were attempted
+*None of the bonus implementations were attempted
+
+**Currently the delay RTO is set at 2000 to make debugging easier.
+
+*** To view the sliding window, uncomment lines 260-262 in RDT.java
 
 RDT.java
 
